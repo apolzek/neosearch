@@ -5,12 +5,58 @@ import json
 import requests
 import yaml
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
 
-# Caminho padrão para o arquivo de configuração YAML
 CONFIG_PATH = "config.yaml"
 CONFIG_ENV_VAR = "CONFIG_FILE_PATH"
+RATE_LIMIT_DURATION = 60  # 1 minuto
+RATE_LIMIT_REQUESTS = 30  # 30 requisições por minuto
+request_history = {}
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://bookmarks.apolzek.io"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    client_ip = request.client.host
+    current_time = time.time()
+    
+    # Limpe requisições antigas
+    for ip in list(request_history.keys()):
+        request_history[ip] = [t for t in request_history[ip] if current_time - t < RATE_LIMIT_DURATION]
+        if not request_history[ip]:
+            del request_history[ip]
+    
+    # Verifique o limite de taxa
+    if client_ip in request_history and len(request_history[client_ip]) >= RATE_LIMIT_REQUESTS:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Limite de taxa excedido. Por favor, tente novamente mais tarde."}
+        )
+    
+    # Adicione requisição ao histórico
+    if client_ip not in request_history:
+        request_history[client_ip] = []
+    request_history[client_ip].append(current_time)
+    
+    # Processe a requisição
+    response = await call_next(request)
+    return response
+
 
 class RepositoryAddRequest(BaseModel):
     path: str

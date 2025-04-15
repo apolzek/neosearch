@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>neosearch by apolzek</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #FF6B81;
+            --secondary-color: #9C88FF;
+            --background-color: #1F2232;
+            --text-color: #F8F9FA;
+            --highlight-color: #2ED573;
+            --shadow-color: rgba(0, 0, 0, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Comic Sans MS', 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ctext x='0' y='10' font-family='monospace' font-size='10' fill='%232b3252'%3E(*^_^*)%3C/text%3E%3Ctext x='30' y='30' font-family='monospace' font-size='10' fill='%232b3252'%3E(~_^)%3C/text%3E%3Ctext x='60' y='50' font-family='monospace' font-size='10' fill='%232b3252'%3E(^o^)/%3C/text%3E%3Ctext x='10' y='70' font-family='monospace' font-size='10' fill='%232b3252'%3E=^_^=%3C/text%3E%3Ctext x='50' y='90' font-family='monospace' font-size='10' fill='%232b3252'%3E(>_<)%3C/text%3E%3C/svg%3E");
+            background-repeat: repeat;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            z-index: 1;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 0 var(--secondary-color);
+            letter-spacing: 2px;
+        }
+        .logo {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 2.5rem;
+            letter-spacing: 2px;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            line-height: 1;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .logo {
+                font-size: 1.8rem;
+            }
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 15px 50px 15px 20px;
+            border-radius: 25px;
+            border: 3px solid var(--primary-color);
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px var(--shadow-color);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--highlight-color);
+            box-shadow: 0 0 15px rgba(46, 213, 115, 0.5);
+        }
+
+        .search-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: var(--primary-color);
+            border: none;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .search-btn:hover {
+            background-color: var(--highlight-color);
+        }
+
+        .search-icon {
+            font-size: 1.2rem;
+        }
+
+        .autocomplete-container {
+            position: absolute;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 5px 15px var(--shadow-color);
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 10;
+            display: none;
+            text-align: left;
+            border: 2px dashed var(--secondary-color);
+        }
+
+        .autocomplete-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            color: #333;
+            border-bottom: 1px dotted var(--primary-color);
+            transition: all 0.2s ease;
+        }
+
+        .autocomplete-item:hover, .autocomplete-item.selected {
+            background-color: rgba(156, 136, 255, 0.2);
+        }
+
+        .item-url {
+            font-weight: bold;
+            color: var(--secondary-color);
+            margin-bottom: 3px;
+        }
+
+        .item-description {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .item-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .tag {
+            background-color: var(--highlight-color);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+        }
+
+        .highlighted {
+            background-color: rgba(255, 107, 129, 0.3);
+            font-weight: bold;
+        }
+
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .search-results {
+            text-align: left;
+            margin-top: 20px;
+            background: rgba(31, 34, 50, 0.8);
+            padding: 15px;
+            border-radius: 15px;
+            border: 2px solid var(--primary-color);
+            display: none;
+        }
+
+        .result-item {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed var(--secondary-color);
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading:after {
+            content: '...';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .error-message {
+            color: var(--primary-color);
+            background: rgba(255, 107, 129, 0.1);
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border: 1px solid var(--primary-color);
+            display: none;
+        }
+
+        /* ASCII Art responsivo */
+        @media (max-width: 768px) {
+            .logo {
+                font-size: 1rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+        }
+        .footer {
+            font-family: 'Share Tech Mono', monospace;
+
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            text-align: center;
+            font-size: 1rem;
+            /* letter-spacing: 1px; */
+            color: var(--secondary-color);
+            background-color: rgba(31, 34, 50, 0.7);
+            /* text-transform: uppercase; */
+            z-index: 10;
+            /* border-top: 1px solid var(--secondary-color); */
+            backdrop-filter: blur(5px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            NEOSEARCH 
+        </div>
+        
+        <!-- <h1>NeoSearch</h1> -->
+        <div class="search-box">
+            <input type="text" class="search-input" id="search-input" placeholder="Search by URL, description or tags..." autocomplete="off">
+            <button class="search-btn">
+                <span class="search-icon">🔍</span>
+            </button>
+            <div class="autocomplete-container" id="autocomplete-container"></div>
+        </div>
+        <div class="loading" id="loading">Carregando</div>
+        <div class="error-message" id="error-message"></div>
+        <div class="search-results" id="search-results"></div>
+    </div>
+    <canvas id="matrix-canvas"></canvas>
+
+    <script>
+        const API_BASE_URL = '/search';
+        
+        let resultsCache = [];
+        
+        const searchInput = document.getElementById('search-input');
+        const autocompleteContainer = document.getElementById('autocomplete-container');
+        const searchResults = document.getElementById('search-results');
+        const loadingIndicator = document.getElementById('loading');
+        const errorMessage = document.getElementById('error-message');
+        let selectedIndex = -1;
+
+        // Função para buscar dados da API
+        async function fetchSearchResults(query) {
+            try {
+                loadingIndicator.style.display = 'block';
+                errorMessage.style.display = 'none';
+                
+                // Construção da URL com parâmetros de consulta
+                const url = `${API_BASE_URL}?keyword=${encodeURIComponent(query)}`;
+                
+                const response = await fetch(url);
+                 
+                if (!response.ok) {
+                    throw new Error(`Erro na API: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                resultsCache = data.results;
+                return data.results;
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                // errorMessage.textContent = `Error fetching data: ${error.message}`;
+                errorMessage.textContent = `Error fetching data =()`;
+                errorMessage.style.display = 'block';
+                return [];
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        // Função para o autocomplete inteligente
+        async function performAutocomplete(query) {
+            if (!query.trim()) {
+                autocompleteContainer.style.display = 'none';
+                return;
+            }
+
+            const lowercaseQuery = query.toLowerCase();
+            
+            // Busca resultados da API
+            const apiResults = await fetchSearchResults(query);
+            
+            if (apiResults.length === 0) {
+                autocompleteContainer.style.display = 'none';
+                return;
+            }
+            
+            // Adapta o formato dos resultados da API para o formato esperado pelo frontend
+            const adaptedResults = apiResults.map(item => {
+                // Extrai URL, descrição e tags dos resultados da API
+                // Adapte conforme a estrutura real dos seus dados
+                return {
+                    url: item.url || item.path || item.link || '',
+                    description: item.description || item.desc || '',
+                    tags: item.tags || []
+                };
+            });
+            
+            // Algoritmo de pontuação para ranquear resultados
+            const scoredResults = adaptedResults.map(item => {
+                let score = 0;
+                
+                // Pontuação para URL (peso alto se começar com a consulta)
+                if (item.url.toLowerCase().includes(lowercaseQuery)) {
+                    score += 10;
+                    if (item.url.toLowerCase().startsWith(lowercaseQuery)) {
+                        score += 15;
+                    }
+                }
+                
+                // Pontuação para descrição (palavras completas têm peso maior)
+                const words = item.description.toLowerCase().split(' ');
+                for (const word of words) {
+                    if (word === lowercaseQuery) {
+                        score += 8; // Palavra exata
+                    } else if (word.startsWith(lowercaseQuery)) {
+                        score += 5; // Começa com a consulta
+                    } else if (word.includes(lowercaseQuery)) {
+                        score += 3; // Contém a consulta
+                    }
+                }
+                
+                // Pontuação para tags (correspondência exata tem peso maior)
+                for (const tag of item.tags) {
+                    if (tag === lowercaseQuery) {
+                        score += 12; // Tag exata
+                    } else if (tag.startsWith(lowercaseQuery)) {
+                        score += 8; // Tag começa com a consulta
+                    } else if (tag.includes(lowercaseQuery)) {
+                        score += 6; // Tag contém a consulta
+                    }
+                }
+                
+                return { item, score };
+            });
+            
+            // Filtra resultados com pontuação > 0 e ordena por pontuação
+            const filteredResults = scoredResults
+                .filter(result => result.score > 0)
+                .sort((a, b) => b.score - a.score);
+            
+            // Limita a 6 resultados
+            const limitedResults = filteredResults.slice(0, 6);
+            
+            // Exibe resultados formatados
+            if (limitedResults.length > 0) {
+                autocompleteContainer.innerHTML = '';
+                limitedResults.forEach((result, index) => {
+                    const item = result.item;
+                    const div = document.createElement('div');
+                    div.className = 'autocomplete-item';
+                    div.dataset.index = index;
+                    
+                    // Destaca texto correspondente
+                    function highlightMatch(text) {
+                        if (!text) return '';
+                        const regex = new RegExp(`(${lowercaseQuery})`, 'gi');
+                        return text.replace(regex, '<span class="highlighted">$1</span>');
+                    }
+                    
+                    div.innerHTML = `
+                        <div class="item-url">${highlightMatch(item.url)}</div>
+                        <div class="item-description">${highlightMatch(item.description)}</div>
+                        <div class="item-tags">
+                            ${item.tags.map(tag => `<span class="tag">${highlightMatch(tag)}</span>`).join('')}
+                        </div>
+                    `;
+                    
+                    div.addEventListener('click', () => {
+                        selectItem(item);
+                    });
+                    
+                    autocompleteContainer.appendChild(div);
+                });
+                
+                autocompleteContainer.style.display = 'block';
+                selectedIndex = -1;
+            } else {
+                autocompleteContainer.style.display = 'none';
+            }
+        }
+
+        // Função para selecionar um item
+        function selectItem(item) {
+            searchInput.value = item.url;
+            autocompleteContainer.style.display = 'none';
+            
+            // Exibe os resultados da pesquisa
+            searchResults.innerHTML = `
+                <div class="result-item">
+                    <div class="item-url">${item.url}</div>
+                    <div class="item-description">${item.description}</div>
+                    <div class="item-tags">
+                        ${item.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+            searchResults.style.display = 'block';
+        }
+
+        // Listener para o input de pesquisa com debounce para melhor performance
+        let debounceTimer;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                performAutocomplete(searchInput.value);
+            }, 300); // 300ms debounce para reduzir chamadas à API
+        });
+
+        // Listener para o botão de pesquisa
+        document.querySelector('.search-btn').addEventListener('click', async () => {
+            const query = searchInput.value.trim();
+            if (query) {
+                try {
+                    loadingIndicator.style.display = 'block';
+                    errorMessage.style.display = 'none';
+                    searchResults.style.display = 'none';
+                    
+                    // Busca resultados da API
+                    const results = await fetchSearchResults(query);
+                    
+                    if (results.length > 0) {
+                        // Adapta o formato do primeiro resultado
+                        const firstResult = {
+                            url: results[0].url || results[0].path || results[0].link || '',
+                            description: results[0].description || results[0].desc || '',
+                            tags: results[0].tags || []
+                        };
+                        
+                        selectItem(firstResult);
+                    } else {
+                        searchResults.innerHTML = `<p>Nenhum resultado encontrado para "${query}"</p>`;
+                        searchResults.style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error('Erro na pesquisa:', error);
+                    errorMessage.textContent = `Erro na pesquisa: ${error.message}`;
+                    errorMessage.style.display = 'block';
+                } finally {
+                    loadingIndicator.style.display = 'none';
+                }
+            }
+        });
+
+        // Navegação por teclado
+        searchInput.addEventListener('keydown', (e) => {
+            const items = autocompleteContainer.querySelectorAll('.autocomplete-item');
+            
+            if (items.length === 0) return;
+            
+            // Seta para baixo
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = (selectedIndex + 1) % items.length;
+                updateSelection(items);
+            }
+            
+            // Seta para cima
+            else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+                updateSelection(items);
+            }
+            
+            // Enter para selecionar
+            else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0) {
+                    const selectedItem = resultsCache[parseInt(items[selectedIndex].dataset.index)];
+                    // Adapta o formato do resultado selecionado
+                    const adaptedItem = {
+                        url: selectedItem.url || selectedItem.path || selectedItem.link || '',
+                        description: selectedItem.description || selectedItem.desc || '',
+                        tags: selectedItem.tags || []
+                    };
+                    selectItem(adaptedItem);
+                } else if (autocompleteContainer.style.display === 'block' && items.length > 0) {
+                    // Se nenhum item estiver selecionado mas houver sugestões, seleciona o primeiro
+                    const firstItem = resultsCache[parseInt(items[0].dataset.index)];
+                    // Adapta o formato do primeiro resultado
+                    const adaptedItem = {
+                        url: firstItem.url || firstItem.path || firstItem.link || '',
+                        description: firstItem.description || firstItem.desc || '',
+                        tags: firstItem.tags || []
+                    };
+                    selectItem(adaptedItem);
+                }
+            }
+            
+            // Escape para fechar sugestões
+            else if (e.key === 'Escape') {
+                autocompleteContainer.style.display = 'none';
+            }
+        });
+
+        // Atualiza a seleção visual
+        function updateSelection(items) {
+            items.forEach((item, index) => {
+                if (index === selectedIndex) {
+                    item.classList.add('selected');
+                    // Scroll para o item selecionado se necessário
+                    if (item.offsetTop < autocompleteContainer.scrollTop || 
+                        item.offsetTop + item.offsetHeight > autocompleteContainer.scrollTop + autocompleteContainer.offsetHeight) {
+                        item.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+                    }
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        }
+
+        // Fecha o autocomplete quando clicar fora
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !autocompleteContainer.contains(e.target)) {
+                autocompleteContainer.style.display = 'none';
+            }
+        });
+
+        // Efeito de foco no input
+        searchInput.addEventListener('focus', () => {
+            if (searchInput.value.trim()) {
+                performAutocomplete(searchInput.value);
+            }
+        });
+
+// Efeito Matrix quando o usuário digita
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Configura o tamanho do canvas para cobrir toda a tela
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Caracteres para o efeito Matrix (incluindo katakana e emoji de anime)
+        const matrixChars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン♥♡☆★0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+        const charSize = 16;
+        const columns = Math.floor(canvas.width / charSize);
+
+        // Array para guardar a posição Y de cada coluna
+        const drops = [];
+        for (let i = 0; i < columns; i++) {
+            drops[i] = -1;
+        }
+
+        // Controle do estado de digitação
+        let isTyping = false;
+        let typingTimeout;
+
+        // Função para criar novas gotas quando o usuário digita
+        function createDrops(count) {
+            for (let i = 0; i < count; i++) {
+                const col = Math.floor(Math.random() * columns);
+                if (drops[col] === -1) {
+                    drops[col] = 0;
+                }
+            }
+            
+            isTyping = true;
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                isTyping = false;
+            }, 500); // Reduzido para 500ms para ser mais reativo quando para de digitar
+        }
+
+        // Adiciona listener ao input de pesquisa
+        searchInput.addEventListener('input', (e) => {
+            // Cria novas gotas baseado no tamanho do texto digitado
+            createDrops(5 + Math.floor(Math.random() * 5)); // Aumentado para mais gotas por digitação
+        });
+
+        // Adiciona listeners para keydown e keyup para melhor responsividade
+        searchInput.addEventListener('keydown', () => {
+            isTyping = true;
+            clearTimeout(typingTimeout);
+        });
+
+        searchInput.addEventListener('keyup', () => {
+            // Define um pequeno timeout após soltar a tecla
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                isTyping = false;
+            }, 300); // Reduzido ainda mais para parar rapidamente após parar de digitar
+        });
+
+        // Desenha o efeito Matrix
+        function draw() {
+            // Semi-transparente para criar rastro
+            ctx.fillStyle = 'rgba(31, 34, 50, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.font = charSize + 'px monospace';
+            
+            for (let i = 0; i < columns; i++) {
+                if (drops[i] >= 0) {
+                    // Gera um caractere aleatório
+                    const char = matrixChars.charAt(Math.floor(Math.random() * matrixChars.length));
+                    
+                    // Cor baseada na distância (verde mais claro na frente e mais escuro atrás)
+                    const colorValue = Math.max(100, 255 - (drops[i] * 10));
+                    
+                    // Alterna entre as cores do tema
+                    let color;
+                    const colorChoice = Math.floor(Math.random() * 3);
+                    if (colorChoice === 0) {
+                        color = `rgba(${colorValue}, 107, 129, 0.9)`; // var(--primary-color)
+                    } else if (colorChoice === 1) {
+                        color = `rgba(156, 136, ${colorValue}, 0.9)`; // var(--secondary-color)
+                    } else {
+                        color = `rgba(46, ${colorValue}, 115, 0.9)`; // var(--highlight-color)
+                    }
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillText(char, i * charSize, drops[i] * charSize);
+                    
+                    // Move a gota para baixo
+                    drops[i]++;
+                    
+                    // Se a gota saiu da tela, reinicia
+                    if (drops[i] * charSize > canvas.height) {
+                        drops[i] = -1;
+                    }
+                } else if (isTyping && Math.random() > 0.95) {
+                    // Maior chance de criar novas gotas durante a digitação
+                    // Mas APENAS se estiver digitando
+                    drops[i] = 0;
+                }
+            }
+            
+            requestAnimationFrame(draw);
+        }
+
+        // Redimensiona o canvas quando a janela muda de tamanho
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Inicia o efeito Matrix
+        draw();
+    </script>
+    <div class="footer">
+        <span style="font-style: italic; color: var(--primary-color);"> @apolzek</span>
+    </div>
+</body>
+</html>
