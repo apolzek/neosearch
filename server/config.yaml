@@ -1,4 +1,0 @@
-local_files:
-  - /app/repositories/bookmarks.json
-  - /app/repositories/invalid.json
-  - /app/repositories/private.json
