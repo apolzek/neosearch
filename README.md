@@ -68,7 +68,7 @@ pip install pyinstaller
 pyinstaller --onefile --distpath ./dist --name neosearch main.py
 ```
 
-
-
-
-
+  The nginx SSL error is resolved. Your application should now be accessible at:
+  - http://localhost (nginx reverse proxy)
+  - http://localhost:8080 (direct frontend access)
+  - http://localhost:8000 (direct backend access)
