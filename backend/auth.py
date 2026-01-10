@@ -99,6 +99,21 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return user
 
 
+async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
+    """Optional authentication - returns user if valid token, None otherwise (doesn't raise 401)"""
+    if credentials is None:
+        return None
+
+    try:
+        token = credentials.credentials
+        token_data = decode_token(token)
+        user = db.get_user_by_id(token_data.user_id)
+        return user
+    except:
+        # Invalid token or user not found - return None instead of raising exception
+        return None
+
+
 def authenticate_user(username: str, password: str) -> Optional[dict]:
     """Authenticate a user with username and password"""
     user = db.get_user_by_username(username)

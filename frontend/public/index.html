@@ -38,8 +38,8 @@
         }
 
         .container {
-            width: 100%;
-            max-width: 600px;
+            width: 95%;
+            max-width: none;
             text-align: center;
             z-index: 1;
             padding: 20px;
@@ -70,8 +70,11 @@
 
         .search-box {
             position: relative;
-            width: 100%;
+            width: 44vw;
+            max-width: 1176px;
             margin-bottom: 20px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .search-input {
@@ -629,6 +632,37 @@
         }
 
         /* ============================================
+           LOGIN BUTTON STYLES
+           ============================================ */
+
+        .login-button-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+        }
+
+        .btn-login {
+            background: linear-gradient(135deg, var(--highlight-color) 0%, var(--primary-color) 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(46, 213, 115, 0.3);
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46, 213, 115, 0.5);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--highlight-color) 100%);
+        }
+
+        /* ============================================
            REPOSITORY LIST STYLES
            ============================================ */
 
@@ -748,8 +782,13 @@
 
     <!-- Main Application -->
     <div id="main-app" style="display: none;">
-    <!-- User Menu -->
-    <div class="user-menu">
+    <!-- Login Button (for anonymous users) -->
+    <div id="login-button" class="login-button-container" style="display: none;">
+        <button class="btn-login" onclick="openLoginModal()">Login</button>
+    </div>
+
+    <!-- User Menu (for authenticated users) -->
+    <div id="user-menu" class="user-menu" style="display: none;">
         <button class="user-menu-btn" onclick="toggleUserMenu()">
             <span id="username-display">User</span> ▼
         </button>
@@ -766,7 +805,7 @@
 
         <!-- <h1>NeoSearch</h1> -->
         <div class="search-box">
-            <input type="text" class="search-input" id="search-input" placeholder="Search by URL, description or tags..." autocomplete="off">
+            <input type="text" class="search-input" id="search-input" placeholder="Search by URL, description or tags..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             <button class="search-btn">
                 <span class="search-icon">🔍</span>
             </button>
@@ -892,7 +931,6 @@
     <script>
         const API_BASE_URL = '/search';
 
-        let resultsCache = [];
         let currentUser = null;
 
         // ============================================
@@ -910,6 +948,43 @@
         function clearAuthToken() {
             localStorage.removeItem('auth_token');
             currentUser = null;
+        }
+
+        function clearSearchState() {
+            // Clear search input
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) searchInput.value = '';
+
+            // Clear autocomplete
+            const autocompleteContainer = document.getElementById('autocomplete-container');
+            if (autocompleteContainer) {
+                autocompleteContainer.innerHTML = '';
+                autocompleteContainer.style.display = 'none';
+            }
+
+            // Clear search results
+            const searchResults = document.getElementById('search-results');
+            if (searchResults) {
+                searchResults.innerHTML = '';
+                searchResults.style.display = 'none';
+            }
+
+            // Clear error messages
+            const errorMessage = document.getElementById('error-message');
+            if (errorMessage) {
+                errorMessage.innerHTML = '';
+                errorMessage.style.display = 'none';
+            }
+
+            // Clear loading indicator
+            const loadingIndicator = document.getElementById('loading');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
+
+            // Clear autocomplete results array
+            currentAutocompleteResults = [];
+            selectedIndex = -1;
         }
 
         function isAuthenticated() {
@@ -954,7 +1029,7 @@
 
         function showLoginScreen() {
             document.getElementById('auth-screen').style.display = 'flex';
-            document.getElementById('main-app').style.display = 'none';
+            // Don't hide main-app when used as modal
         }
 
         function showMainApp() {
@@ -979,8 +1054,11 @@
                     const data = await response.json();
                     setAuthToken(data.access_token);
                     await loadCurrentUser();
-                    showMainApp();
+                    document.getElementById('auth-screen').style.display = 'none';
+                    document.getElementById('main-app').style.display = 'block';
                     updateUserMenu();
+                    showUserMenu();
+                    clearSearchState(); // Clear any previous search state
                 } else {
                     const error = await response.json();
                     errorEl.textContent = error.detail || 'Login failed';
@@ -1015,8 +1093,11 @@
                     const data = await response.json();
                     setAuthToken(data.access_token);
                     await loadCurrentUser();
-                    showMainApp();
+                    document.getElementById('auth-screen').style.display = 'none';
+                    document.getElementById('main-app').style.display = 'block';
                     updateUserMenu();
+                    showUserMenu();
+                    clearSearchState(); // Clear any previous search state
                 } else {
                     const error = await response.json();
                     errorEl.textContent = error.detail || 'Registration failed';
@@ -1030,6 +1111,13 @@
 
         function handleLogout() {
             clearAuthToken();
+            clearSearchState();
+            currentUser = null;
+            showLoginButton();
+            // Optionally show a logout message or refresh search to public mode
+        }
+
+        function openLoginModal() {
             showLoginScreen();
         }
 
@@ -1039,18 +1127,36 @@
             }
         }
 
+        function showUserMenu() {
+            const userMenu = document.getElementById('user-menu');
+            const loginButton = document.getElementById('login-button');
+            if (userMenu) userMenu.style.display = 'block';
+            if (loginButton) loginButton.style.display = 'none';
+        }
+
+        function showLoginButton() {
+            const userMenu = document.getElementById('user-menu');
+            const loginButton = document.getElementById('login-button');
+            if (userMenu) userMenu.style.display = 'none';
+            if (loginButton) loginButton.style.display = 'block';
+        }
+
         // Initialize on page load
         window.addEventListener('DOMContentLoaded', async () => {
+            // Always show main app (search interface)
+            showMainApp();
+
+            // Check authentication status for user menu
             if (isAuthenticated()) {
                 await loadCurrentUser();
                 if (currentUser) {
-                    showMainApp();
                     updateUserMenu();
+                    showUserMenu();
                 } else {
-                    showLoginScreen();
+                    showLoginButton();
                 }
             } else {
-                showLoginScreen();
+                showLoginButton();
             }
         });
 
@@ -1251,6 +1357,7 @@
         const loadingIndicator = document.getElementById('loading');
         const errorMessage = document.getElementById('error-message');
         let selectedIndex = -1;
+        let currentAutocompleteResults = [];
 
         // Função para buscar dados da API
         async function fetchSearchResults(query) {
@@ -1261,14 +1368,20 @@
                 // Construção da URL com parâmetros de consulta
                 const url = `${API_BASE_URL}?keyword=${encodeURIComponent(query)}`;
 
-                const response = await authFetch(url);
+                // Include auth token if available (optional auth)
+                const headers = {};
+                const token = getAuthToken();
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const response = await fetch(url, { headers });
 
                 if (!response.ok) {
                     throw new Error(`Erro na API: ${response.status}`);
                 }
 
                 const data = await response.json();
-                resultsCache = data.results;
                 return data.results;
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -1285,6 +1398,9 @@
         async function performAutocomplete(query) {
             if (!query.trim()) {
                 autocompleteContainer.style.display = 'none';
+                autocompleteContainer.innerHTML = '';
+                currentAutocompleteResults = [];
+                selectedIndex = -1;
                 return;
             }
 
@@ -1357,6 +1473,7 @@
             
             // Exibe resultados formatados
             if (limitedResults.length > 0) {
+                currentAutocompleteResults = limitedResults.map(r => r.item);
                 autocompleteContainer.innerHTML = '';
                 limitedResults.forEach((result, index) => {
                     const item = result.item;
@@ -1395,10 +1512,7 @@
 
         // Função para selecionar um item
         function selectItem(item) {
-            searchInput.value = item.url;
-            autocompleteContainer.style.display = 'none';
-            
-            // Exibe os resultados da pesquisa
+            // Display the result first
             searchResults.innerHTML = `
                 <div class="result-item">
                     <div class="item-url">${item.url}</div>
@@ -1409,6 +1523,13 @@
                 </div>
             `;
             searchResults.style.display = 'block';
+
+            // Clear search input and autocomplete after showing result
+            searchInput.value = '';
+            autocompleteContainer.style.display = 'none';
+            autocompleteContainer.innerHTML = '';
+            currentAutocompleteResults = [];
+            selectedIndex = -1;
         }
 
         // Listener para o input de pesquisa com debounce para melhor performance
@@ -1463,6 +1584,12 @@
                     } else {
                         searchResults.innerHTML = `<p>Nenhum resultado encontrado para "${query}"</p>`;
                         searchResults.style.display = 'block';
+                        // Clear search input even when no results
+                        searchInput.value = '';
+                        autocompleteContainer.style.display = 'none';
+                        autocompleteContainer.innerHTML = '';
+                        currentAutocompleteResults = [];
+                        selectedIndex = -1;
                     }
                 } catch (error) {
                     console.error('Erro na pesquisa:', error);
@@ -1508,25 +1635,11 @@
                 }
 
                 // EXISTING: Original autocomplete selection logic
-                if (selectedIndex >= 0) {
-                    const selectedItem = resultsCache[parseInt(items[selectedIndex].dataset.index)];
-                    // Adapta o formato do resultado selecionado
-                    const adaptedItem = {
-                        url: selectedItem.url || selectedItem.path || selectedItem.link || '',
-                        description: selectedItem.description || selectedItem.desc || '',
-                        tags: selectedItem.tags || []
-                    };
-                    selectItem(adaptedItem);
-                } else if (autocompleteContainer.style.display === 'block' && items.length > 0) {
+                if (selectedIndex >= 0 && currentAutocompleteResults[selectedIndex]) {
+                    selectItem(currentAutocompleteResults[selectedIndex]);
+                } else if (autocompleteContainer.style.display === 'block' && currentAutocompleteResults.length > 0) {
                     // Se nenhum item estiver selecionado mas houver sugestões, seleciona o primeiro
-                    const firstItem = resultsCache[parseInt(items[0].dataset.index)];
-                    // Adapta o formato do primeiro resultado
-                    const adaptedItem = {
-                        url: firstItem.url || firstItem.path || firstItem.link || '',
-                        description: firstItem.description || firstItem.desc || '',
-                        tags: firstItem.tags || []
-                    };
-                    selectItem(adaptedItem);
+                    selectItem(currentAutocompleteResults[0]);
                 }
             }
             
@@ -1727,9 +1840,6 @@
                 setTimeout(() => {
                     closeAddModal();
                 }, 1500);
-
-                // Clear results cache to force refresh on next search
-                resultsCache = [];
 
             } catch (error) {
                 console.error('Error adding item:', error);

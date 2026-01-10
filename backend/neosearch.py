@@ -188,10 +188,19 @@ async def list_bookmarks(current_user: dict = Depends(auth.get_current_user)):
 @app.get("/search")
 async def search_bookmarks(
     keyword: Optional[str] = Query(None, description="Search keyword"),
-    current_user: dict = Depends(auth.get_current_user)
+    current_user: Optional[dict] = Depends(auth.get_current_user_optional)
 ):
-    """Search user's bookmarks"""
-    bookmarks = db.search_user_bookmarks(current_user["id"], keyword)
+    """
+    Search bookmarks:
+    - If authenticated: search user's own bookmarks
+    - If anonymous: search all public bookmarks
+    """
+    if current_user:
+        # Authenticated user - search their own bookmarks
+        bookmarks = db.search_user_bookmarks(current_user["id"], keyword)
+    else:
+        # Anonymous user - search public bookmarks from all users
+        bookmarks = db.search_public_bookmarks(keyword)
 
     # Format results to match frontend expectations
     results = [{
@@ -199,7 +208,8 @@ async def search_bookmarks(
         "description": b["description"],
         "tags": b["tags"],
         "category": b["category"],
-        "source": b["source"]
+        "source": b.get("source"),
+        "username": b.get("username")  # Include username for public search results
     } for b in bookmarks]
 
     return {"results": results}
@@ -389,3 +399,38 @@ async def delete_repository(
         )
 
     return {"message": "Repository and associated bookmarks deleted successfully"}
+
+
+# ============================================
+# PUBLIC ENDPOINTS - USER PROFILES
+# ============================================
+
+@app.get("/users/{username}")
+async def get_public_profile(username: str):
+    """Get public user profile with repositories and bookmarks"""
+    user = db.get_public_user_by_username(username)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    repositories = db.get_user_public_repositories(user["id"])
+    bookmarks = db.get_user_public_bookmarks(user["id"])
+
+    return {
+        "user": user,
+        "repositories": repositories,
+        "bookmarks": bookmarks,
+        "stats": {
+            "total_repositories": len(repositories),
+            "total_bookmarks": len(bookmarks)
+        }
+    }
+
+
+@app.get("/users")
+async def list_public_users():
+    """List all users with public content"""
+    users = db.get_users_with_public_content()
+    return {"users": users}

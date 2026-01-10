@@ -52,6 +52,7 @@ def init_database():
                 tags TEXT,
                 category TEXT,
                 source TEXT,
+                is_public INTEGER DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
@@ -64,15 +65,31 @@ def init_database():
                 user_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
                 url TEXT NOT NULL,
+                is_public INTEGER DEFAULT 1,
                 last_synced TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
         ''')
 
-        # Create indexes for better performance
+        # Migrate existing data: add is_public column if it doesn't exist
+        try:
+            cursor.execute('SELECT is_public FROM bookmarks LIMIT 1')
+        except:
+            cursor.execute('ALTER TABLE bookmarks ADD COLUMN is_public INTEGER DEFAULT 1')
+            cursor.execute('UPDATE bookmarks SET is_public = 1 WHERE is_public IS NULL')
+
+        try:
+            cursor.execute('SELECT is_public FROM repositories LIMIT 1')
+        except:
+            cursor.execute('ALTER TABLE repositories ADD COLUMN is_public INTEGER DEFAULT 1')
+            cursor.execute('UPDATE repositories SET is_public = 1 WHERE is_public IS NULL')
+
+        # Create indexes for better performance (after columns exist)
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks(user_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_repositories_user_id ON repositories(user_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_bookmarks_is_public ON bookmarks(is_public)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_repositories_is_public ON repositories(is_public)')
 
 
 # ============================================
@@ -112,14 +129,14 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
 # BOOKMARK OPERATIONS
 # ============================================
 
-def create_bookmark(user_id: int, url: str, description: str, tags: List[str], category: str, source: Optional[str] = None) -> int:
+def create_bookmark(user_id: int, url: str, description: str, tags: List[str], category: str, source: Optional[str] = None, is_public: bool = True) -> int:
     """Create a new bookmark for a user"""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         tags_json = json.dumps(tags)
         cursor.execute(
-            'INSERT INTO bookmarks (user_id, url, description, tags, category, source) VALUES (?, ?, ?, ?, ?, ?)',
-            (user_id, url, description, tags_json, category, source)
+            'INSERT INTO bookmarks (user_id, url, description, tags, category, source, is_public) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (user_id, url, description, tags_json, category, source, 1 if is_public else 0)
         )
         return cursor.lastrowid
 
@@ -206,13 +223,13 @@ def delete_bookmarks_by_source(user_id: int, source: str):
 # REPOSITORY OPERATIONS
 # ============================================
 
-def create_repository(user_id: int, name: str, url: str) -> int:
+def create_repository(user_id: int, name: str, url: str, is_public: bool = True) -> int:
     """Create a new repository"""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            'INSERT INTO repositories (user_id, name, url) VALUES (?, ?, ?)',
-            (user_id, name, url)
+            'INSERT INTO repositories (user_id, name, url, is_public) VALUES (?, ?, ?, ?)',
+            (user_id, name, url, 1 if is_public else 0)
         )
         return cursor.lastrowid
 
@@ -263,3 +280,108 @@ def delete_repository(repository_id: int, user_id: int) -> bool:
             return cursor.rowcount > 0
 
         return False
+
+
+# ============================================
+# PUBLIC SEARCH OPERATIONS
+# ============================================
+
+def search_public_bookmarks(keyword: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Search all public bookmarks across all users"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        if keyword:
+            # Search in URL, description, tags, and category for public bookmarks only
+            query = '''
+                SELECT b.*, u.username
+                FROM bookmarks b
+                JOIN users u ON b.user_id = u.id
+                WHERE b.is_public = 1 AND (
+                    b.url LIKE ? OR
+                    b.description LIKE ? OR
+                    b.tags LIKE ? OR
+                    b.category LIKE ?
+                )
+                ORDER BY b.created_at DESC
+            '''
+            search_term = f'%{keyword}%'
+            cursor.execute(query, (search_term, search_term, search_term, search_term))
+        else:
+            cursor.execute('''
+                SELECT b.*, u.username
+                FROM bookmarks b
+                JOIN users u ON b.user_id = u.id
+                WHERE b.is_public = 1
+                ORDER BY b.created_at DESC
+            ''')
+
+        rows = cursor.fetchall()
+
+        bookmarks = []
+        for row in rows:
+            bookmark = dict(row)
+            bookmark['tags'] = json.loads(bookmark['tags']) if bookmark['tags'] else []
+            bookmarks.append(bookmark)
+
+        return bookmarks
+
+
+def get_user_public_bookmarks(user_id: int) -> List[Dict[str, Any]]:
+    """Get all public bookmarks for a specific user"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM bookmarks
+            WHERE user_id = ? AND is_public = 1
+            ORDER BY created_at DESC
+        ''', (user_id,))
+        rows = cursor.fetchall()
+
+        bookmarks = []
+        for row in rows:
+            bookmark = dict(row)
+            bookmark['tags'] = json.loads(bookmark['tags']) if bookmark['tags'] else []
+            bookmarks.append(bookmark)
+
+        return bookmarks
+
+
+def get_user_public_repositories(user_id: int) -> List[Dict[str, Any]]:
+    """Get all public repositories for a specific user"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM repositories
+            WHERE user_id = ? AND is_public = 1
+            ORDER BY created_at DESC
+        ''', (user_id,))
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_public_user_by_username(username: str) -> Optional[Dict[str, Any]]:
+    """Get public user information by username (no password hash)"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, username, created_at FROM users WHERE username = ?', (username,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def get_users_with_public_content() -> List[Dict[str, Any]]:
+    """Get all users who have public bookmarks or repositories"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT DISTINCT u.id, u.username, u.created_at
+            FROM users u
+            WHERE EXISTS (
+                SELECT 1 FROM bookmarks b WHERE b.user_id = u.id AND b.is_public = 1
+            ) OR EXISTS (
+                SELECT 1 FROM repositories r WHERE r.user_id = u.id AND r.is_public = 1
+            )
+            ORDER BY u.username
+        ''')
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
